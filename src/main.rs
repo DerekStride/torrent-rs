@@ -1,3 +1,5 @@
+mod bencoding;
+
 fn main() {
-    println!("Hello, world!");
+    println!("{:?}", bencoding::decoder::decode("4:spam".to_string()));
 }
