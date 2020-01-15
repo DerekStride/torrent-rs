@@ -6,6 +6,7 @@ use std::cmp;
 pub struct Result {
     string: Option<String>,
     integer: Option<isize>,
+    list: Option<Vec<Result>>,
 }
 
 impl Result {
@@ -13,6 +14,7 @@ impl Result {
         Self {
             string: None,
             integer: None,
+            list: None,
         }
     }
 
@@ -20,6 +22,7 @@ impl Result {
         Self {
             string: Some(data),
             integer: None,
+            list: None,
         }
     }
 
@@ -27,6 +30,15 @@ impl Result {
         Self {
             string: None,
             integer: Some(data),
+            list: None,
+        }
+    }
+
+    pub fn list(data: Vec<Result>) -> Self {
+        Self {
+            string: None,
+            integer: None,
+            list: Some(data),
         }
     }
 
@@ -36,6 +48,10 @@ impl Result {
 
     pub fn is_integer(&self) -> bool {
         self.integer != None
+    }
+
+    pub fn is_list(&self) -> bool {
+        self.list != None
     }
 
     pub fn is_empty(&self) -> bool {
@@ -59,6 +75,8 @@ fn decode_internal(data: String, index: usize) -> (Result, usize) {
         decode_str(data, index)
     } else if code == "i" {
         decode_int(data, index)
+    } else if code == "l" {
+        decode_list(data, index)
     } else {
         (Result::empty(), 0)
     }
@@ -104,9 +122,102 @@ fn decode_int(data: String, index: usize) -> (Result, usize) {
     (Result::integer(number), index + i + 1)
 }
 
+fn decode_list(data: String, index: usize) -> (Result, usize) {
+    let slice = data.get(index..).unwrap();
+    let mut list = Vec::<Result>::new();
+    let mut i = 1;
+    let mut item : Result;
+
+    loop {
+        match slice.get((i)..(i+1)) {
+            Some("e") => break,
+            Some(_) => {},
+            None => return (Result::list(list), index + i),
+        }
+
+        let result = decode_internal(slice.to_string(), i);
+
+        item = result.0;
+        i = result.1;
+        list.push(item);
+    }
+
+    (Result::list(list), index + i)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+
+    // # pp Becoding::Decoder.decode("4:spam")
+    // # pp Becoding::Decoder.decode("i-3e")
+    // # pp Becoding::Decoder.decode("i3e")
+    // # pp Becoding::Decoder.decode("i0e")
+    // # pp Becoding::Decoder.decode("l4:spam4:eggse")
+    // # pp Becoding::Decoder.decode("li-4ei4e4:eggse")
+    // # pp Becoding::Decoder.decode("d4:spaml1:a1:bee")
+    // # pp Becoding::Decoder.decode("d3:cow3:moo4:spam4:eggse")
+
+    #[test]
+    fn test_can_decode_an_empty_list() {
+        let s = "le".to_string();
+        let result = decode(s);
+
+        assert!(result.is_list());
+        assert_eq!(Some(Vec::<Result>::new()), result.list);
+    }
+
+    #[test]
+    fn test_can_decode_a_malformed_list() {
+        let s = "l".to_string();
+        let result = decode(s);
+
+        assert!(result.is_list());
+        assert_eq!(Some(Vec::<Result>::new()), result.list);
+    }
+
+    #[test]
+    fn test_can_decode_a_list_with_one_item() {
+        let s = "li3ee".to_string();
+        let result = decode(s);
+
+        let v = vec![
+            Result::integer(3),
+        ];
+
+        assert!(result.is_list());
+        assert_eq!(Some(v), result.list);
+    }
+
+    #[test]
+    fn test_can_decode_a_list_with_two_items() {
+        let s = "l4:spami3ee".to_string();
+        let result = decode(s);
+
+        let v = vec![
+            Result::string("spam".to_string()),
+            Result::integer(3),
+        ];
+
+        assert!(result.is_list());
+        assert_eq!(Some(v), result.list);
+    }
+
+    #[test]
+    fn test_can_decode_a_list_with_a_list() {
+        let s = "ll4:spami3eee".to_string();
+        let result = decode(s);
+
+        let l = vec![
+            Result::string("spam".to_string()),
+            Result::integer(3),
+        ];
+        let v = vec![Result::list(l)];
+
+        assert!(result.is_list());
+        assert_eq!(Some(v), result.list);
+    }
 
     #[test]
     fn test_can_decode_a_positive_int() {
