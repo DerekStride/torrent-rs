@@ -1,12 +1,33 @@
-// use std::collections::HashMap;
+use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 use regex::Regex;
 use std::cmp;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Result {
     string: Option<String>,
     integer: Option<isize>,
     list: Option<Vec<Result>>,
+    dictionary: Option<HashMap<Result, Result>>,
+}
+
+impl Hash for Result {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        
+        self.string.hash(state);
+        self.integer.hash(state);
+        self.list.hash(state);
+
+        let dict = match &self.dictionary {
+            Some(d)=> d,
+            None => return,
+        };
+
+        for (key, value) in dict {
+            key.hash(state);
+            value.hash(state);
+        }
+    }
 }
 
 impl Result {
@@ -15,6 +36,7 @@ impl Result {
             string: None,
             integer: None,
             list: None,
+            dictionary: None,
         }
     }
 
@@ -23,6 +45,7 @@ impl Result {
             string: Some(data),
             integer: None,
             list: None,
+            dictionary: None,
         }
     }
 
@@ -31,6 +54,7 @@ impl Result {
             string: None,
             integer: Some(data),
             list: None,
+            dictionary: None,
         }
     }
 
@@ -39,24 +63,45 @@ impl Result {
             string: None,
             integer: None,
             list: Some(data),
+            dictionary: None,
         }
     }
 
+    pub fn dictionary(data: HashMap<Result, Result>) -> Self {
+        Self {
+            string: None,
+            integer: None,
+            list: None,
+            dictionary: Some(data),
+        }
+    }
+
+    #[cfg(test)]
     pub fn is_string(&self) -> bool {
         self.string != None
     }
 
+    #[cfg(test)]
     pub fn is_integer(&self) -> bool {
         self.integer != None
     }
 
+    #[cfg(test)]
     pub fn is_list(&self) -> bool {
         self.list != None
     }
 
+    #[cfg(test)]
+    pub fn is_dictionary(&self) -> bool {
+        self.dictionary != None
+    }
+
+    #[cfg(test)]
     pub fn is_empty(&self) -> bool {
         self.string == None &&
-            self.integer == None
+            self.integer == None &&
+            self.list == None &&
+            self.dictionary == None
     }
 }
 
@@ -77,6 +122,8 @@ fn decode_internal(data: String, index: usize) -> (Result, usize) {
         decode_int(data, index)
     } else if code == "l" {
         decode_list(data, index)
+    } else if code == "d" {
+        decode_dictionary(data, index)
     } else {
         (Result::empty(), 0)
     }
@@ -145,19 +192,88 @@ fn decode_list(data: String, index: usize) -> (Result, usize) {
     (Result::list(list), index + i)
 }
 
+fn decode_dictionary(data: String, index: usize) -> (Result, usize) {
+    let slice = data.get(index..).unwrap();
+    let mut dict = HashMap::<Result, Result>::new();
+    let mut i = 1;
+    let mut key : Result;
+    let mut value : Result;
+
+    loop {
+        match slice.get((i)..(i+1)) {
+            Some("e") => break,
+            Some(_) => {},
+            None => return (Result::dictionary(dict), index + i),
+        }
+
+        let result = decode_internal(slice.to_string(), i);
+
+        key = result.0;
+        i = result.1;
+
+        let result = decode_internal(slice.to_string(), i); 
+
+        value = result.0;
+        i = result.1;
+
+        dict.insert(key, value);
+    }
+
+    (Result::dictionary(dict), index + i)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    #[test]
+    fn test_can_decode_an_empty_dictionary() {
+        let s = "de".to_string();
+        let result = decode(s);
+        let d = HashMap::<Result, Result>::new();
 
-    // # pp Becoding::Decoder.decode("4:spam")
-    // # pp Becoding::Decoder.decode("i-3e")
-    // # pp Becoding::Decoder.decode("i3e")
-    // # pp Becoding::Decoder.decode("i0e")
-    // # pp Becoding::Decoder.decode("l4:spam4:eggse")
-    // # pp Becoding::Decoder.decode("li-4ei4e4:eggse")
-    // # pp Becoding::Decoder.decode("d4:spaml1:a1:bee")
-    // # pp Becoding::Decoder.decode("d3:cow3:moo4:spam4:eggse")
+        assert!(result.is_dictionary());
+        assert_eq!(Some(d), result.dictionary);
+    }
+
+    #[test]
+    fn test_can_decode_a_malformed_dictionary() {
+        let s = "d".to_string();
+        let result = decode(s);
+
+        assert!(result.is_dictionary());
+        assert_eq!(Some(HashMap::<Result, Result>::new()), result.dictionary);
+    }
+
+    #[test]
+    fn test_can_decode_a_dictionary_with_one_item() {
+        let s = "d4:spami3ee".to_string();
+        let result = decode(s);
+
+        let mut d = HashMap::<Result, Result>::new();
+        d.insert(Result::string("spam".to_string()), Result::integer(3));
+
+        assert!(result.is_dictionary());
+        assert_eq!(Some(d), result.dictionary);
+    }
+
+    #[test]
+    fn test_can_decode_a_dictionary_with_two_items() {
+        let s = "d4:spami3e3:fool4:spami3eee".to_string();
+        let result = decode(s);
+
+        let v = vec![
+            Result::string("spam".to_string()),
+            Result::integer(3),
+        ];
+
+        let mut d = HashMap::<Result, Result>::new();
+        d.insert(Result::string("spam".to_string()), Result::integer(3));
+        d.insert(Result::string("foo".to_string()), Result::list(v));
+
+        assert!(result.is_dictionary());
+        assert_eq!(Some(d), result.dictionary);
+    }
 
     #[test]
     fn test_can_decode_an_empty_list() {
