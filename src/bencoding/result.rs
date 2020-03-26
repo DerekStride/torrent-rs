@@ -84,21 +84,25 @@ impl Result {
 impl fmt::Debug for Result {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.is_string() {
-            return f.debug_struct("Result")
-                .field("string", &self.string)
-                .finish();
+            return match &self.string {
+                Some(s) => f.write_fmt(format_args!("\"{}\"", s)),
+                None => panic!("is_string() but has no string!"),
+            };
         } else if self.is_integer() {
-            return f.debug_struct("Result")
-                .field("integer", &self.integer)
-                .finish();
+            return match &self.integer {
+                Some(s) => f.write_fmt(format_args!("{}", s)),
+                None => panic!("is_integer() but has no integer!"),
+            };
         } else if self.is_list() {
-            return f.debug_struct("Result")
-                .field("list", &self.list)
-                .finish();
+            return match &self.list {
+                Some(s) => f.write_fmt(format_args!("{:?}", s)),
+                None => panic!("is_list() but has no list!"),
+            };
         } else if self.is_dictionary() {
-            return f.debug_struct("Result")
-                .field("dictionary", &self.dictionary)
-                .finish();
+            return match &self.dictionary {
+                Some(s) => f.write_fmt(format_args!("{:?}", s)),
+                None => panic!("is_dictionary() but has no dictionary!"),
+            };
         } else {
             return f.debug_struct("Result")
             .finish();
