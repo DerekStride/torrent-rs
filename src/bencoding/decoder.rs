@@ -54,7 +54,7 @@ fn decode_str(data: &[u8], index: usize) -> (Result, usize) {
     let utf8_str = match str::from_utf8(s) {
         Ok(val) => val.to_string(),
         Err(_) => {
-            return (Result::string("".to_string()), index+i+1+length);
+            return (Result::bytes(s.to_vec()), index+i+1+length);
         },
     };
 
@@ -305,5 +305,15 @@ mod tests {
 
         assert!(result.is_empty());
         assert_eq!(Result::empty(), result);
+    }
+
+    #[test]
+    fn test_invalid_utf8_string() {
+        let s = b"2:\xc3\x28";
+        let result = decode(s);
+        let bytes = vec![195, 40];
+
+        assert!(result.is_bytes());
+        assert_eq!(Result::bytes(bytes), result);
     }
 }

@@ -8,6 +8,7 @@ pub struct Result {
     pub integer: Option<isize>,
     pub list: Option<Vec<Result>>,
     pub dictionary: Option<HashMap<Result, Result>>,
+    pub bytes: Option<Vec<u8>>,
 }
 
 impl Result {
@@ -17,6 +18,7 @@ impl Result {
             integer: None,
             list: None,
             dictionary: None,
+            bytes: None,
         }
     }
 
@@ -26,6 +28,7 @@ impl Result {
             integer: None,
             list: None,
             dictionary: None,
+            bytes: None,
         }
     }
 
@@ -35,6 +38,7 @@ impl Result {
             integer: Some(data),
             list: None,
             dictionary: None,
+            bytes: None,
         }
     }
 
@@ -44,6 +48,7 @@ impl Result {
             integer: None,
             list: Some(data),
             dictionary: None,
+            bytes: None,
         }
     }
 
@@ -53,6 +58,17 @@ impl Result {
             integer: None,
             list: None,
             dictionary: Some(data),
+            bytes: None,
+        }
+    }
+
+    pub fn bytes(data: Vec<u8>) -> Self {
+        Self {
+            string: None,
+            integer: None,
+            list: None,
+            dictionary: None,
+            bytes: Some(data),
         }
     }
 
@@ -72,12 +88,17 @@ impl Result {
         self.dictionary != None
     }
 
+    pub fn is_bytes(&self) -> bool {
+        self.bytes != None
+    }
+
     #[cfg(test)]
     pub fn is_empty(&self) -> bool {
         self.string == None &&
             self.integer == None &&
             self.list == None &&
-            self.dictionary == None
+            self.dictionary == None &&
+            self.bytes == None
     }
 }
 
@@ -103,6 +124,11 @@ impl fmt::Debug for Result {
                 Some(s) => f.write_fmt(format_args!("{:?}", s)),
                 None => panic!("is_dictionary() but has no dictionary!"),
             };
+        } else if self.is_bytes() {
+            return match &self.bytes {
+                Some(s) => f.write_fmt(format_args!("{:?}", s)),
+                None => panic!("is_bytes() but has no bytes!"),
+            };
         } else {
             return f.debug_struct("Result")
             .finish();
@@ -116,6 +142,7 @@ impl Hash for Result {
         self.string.hash(state);
         self.integer.hash(state);
         self.list.hash(state);
+        self.bytes.hash(state);
 
         let dict = match &self.dictionary {
             Some(d)=> d,
