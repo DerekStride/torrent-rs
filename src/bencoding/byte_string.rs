@@ -7,6 +7,17 @@ impl ByteString {
     pub fn from_vec(s: Vec<u8>) -> ByteString {
         ByteString(s)
     }
+
+    pub fn as_slice(&self) -> &[u8] {
+      match self {
+        &ByteString(ref v)  => &v[..]
+      }
+    }
+
+    pub fn unwrap(self) -> Vec<u8> {
+        let ByteString(v) = self;
+        v
+    }
 }
 
 impl fmt::Display for ByteString {
