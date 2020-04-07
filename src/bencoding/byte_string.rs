@@ -4,14 +4,12 @@ use std::{str, fmt};
 pub struct ByteString(Vec<u8>);
 
 impl ByteString {
-    pub fn from_vec(s: Vec<u8>) -> ByteString {
-        ByteString(s)
+    pub fn from_str(s: &str) -> ByteString {
+        ByteString(s.as_bytes().to_vec())
     }
 
-    pub fn as_slice(&self) -> &[u8] {
-      match self {
-        &ByteString(ref v)  => &v[..]
-      }
+    pub fn from_vec(s: Vec<u8>) -> ByteString {
+        ByteString(s)
     }
 
     pub fn unwrap(self) -> Vec<u8> {

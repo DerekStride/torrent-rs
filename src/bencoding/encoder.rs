@@ -1,4 +1,6 @@
 use crate::bencoding::bencode::{Bencode, ListVec, DictMap};
+
+#[cfg(test)]
 use crate::bencoding::byte_string::ByteString;
 
 pub fn encode(data: Bencode) -> Vec<u8> {
