@@ -1,157 +1,63 @@
-use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
-use std::fmt;
+use std::collections::BTreeMap;
+use std::{str, fmt};
+use crate::bencoding::byte_string::ByteString;
 
-#[derive(PartialEq, Eq)]
-pub struct Result {
-    pub string: Option<String>,
-    pub integer: Option<isize>,
-    pub list: Option<Vec<Result>>,
-    pub dictionary: Option<HashMap<Result, Result>>,
-    pub bytes: Option<Vec<u8>>,
+#[derive(PartialEq, Eq, Debug)]
+pub enum Bencode {
+    Empty,
+    Number(i64),
+    ByteString(Vec<u8>),
+    List(ListVec),
+    Dict(DictMap),
 }
 
-impl Result {
-    pub fn empty() -> Self {
-        Self {
-            string: None,
-            integer: None,
-            list: None,
-            dictionary: None,
-            bytes: None,
-        }
-    }
+pub type ListVec = Vec<Bencode>;
+pub type DictMap = BTreeMap<ByteString, Bencode>;
 
-    pub fn string(data: String) -> Self {
-        Self {
-            string: Some(data),
-            integer: None,
-            list: None,
-            dictionary: None,
-            bytes: None,
-        }
-    }
-
-    pub fn integer(data: isize) -> Self {
-        Self {
-            string: None,
-            integer: Some(data),
-            list: None,
-            dictionary: None,
-            bytes: None,
-        }
-    }
-
-    pub fn list(data: Vec<Result>) -> Self {
-        Self {
-            string: None,
-            integer: None,
-            list: Some(data),
-            dictionary: None,
-            bytes: None,
-        }
-    }
-
-    pub fn dictionary(data: HashMap<Result, Result>) -> Self {
-        Self {
-            string: None,
-            integer: None,
-            list: None,
-            dictionary: Some(data),
-            bytes: None,
-        }
-    }
-
-    pub fn bytes(data: Vec<u8>) -> Self {
-        Self {
-            string: None,
-            integer: None,
-            list: None,
-            dictionary: None,
-            bytes: Some(data),
-        }
-    }
-
-    pub fn is_string(&self) -> bool {
-        self.string != None
-    }
-
-    pub fn is_integer(&self) -> bool {
-        self.integer != None
-    }
-
-    pub fn is_list(&self) -> bool {
-        self.list != None
-    }
-
-    pub fn is_dictionary(&self) -> bool {
-        self.dictionary != None
-    }
-
-    pub fn is_bytes(&self) -> bool {
-        self.bytes != None
-    }
-
-    #[cfg(test)]
-    pub fn is_empty(&self) -> bool {
-        self.string == None &&
-            self.integer == None &&
-            self.list == None &&
-            self.dictionary == None &&
-            self.bytes == None
+impl fmt::Display for Bencode {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        format(fmt, self)
     }
 }
 
-impl fmt::Debug for Result {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.is_string() {
-            return match &self.string {
-                Some(s) => f.write_fmt(format_args!("\"{}\"", s)),
-                None => panic!("is_string() but has no string!"),
-            };
-        } else if self.is_integer() {
-            return match &self.integer {
-                Some(s) => f.write_fmt(format_args!("{}", s)),
-                None => panic!("is_integer() but has no integer!"),
-            };
-        } else if self.is_list() {
-            return match &self.list {
-                Some(s) => f.write_fmt(format_args!("{:?}", s)),
-                None => panic!("is_list() but has no list!"),
-            };
-        } else if self.is_dictionary() {
-            return match &self.dictionary {
-                Some(s) => f.write_fmt(format_args!("{:?}", s)),
-                None => panic!("is_dictionary() but has no dictionary!"),
-            };
-        } else if self.is_bytes() {
-            return match &self.bytes {
-                Some(s) => f.write_fmt(format_args!("{:?}", s)),
-                None => panic!("is_bytes() but has no bytes!"),
-            };
-        } else {
-            return f.debug_struct("Result")
-            .finish();
-        };
+fn format(fmt: &mut fmt::Formatter, v: &Bencode) -> fmt::Result {
+    match *v {
+        Bencode::Empty => { Ok(()) }
+        Bencode::Number(v) => write!(fmt, "{}", v),
+        Bencode::ByteString(ref v) => fmt_bytestring(v, fmt),
+        Bencode::List(ref v) => {
+            write!(fmt, "[")?;
+            let mut first = true;
+            for value in v.iter() {
+                if first {
+                    first = false;
+                } else {
+                    write!(fmt, ", ")?;
+                }
+                write!(fmt, "{}", *value)?;
+            }
+            write!(fmt, "]")
+        }
+        Bencode::Dict(ref v) => {
+            write!(fmt, "{{")?;
+            let mut first = true;
+            for (key, value) in v.iter() {
+                if first {
+                    first = false;
+                } else {
+                    write!(fmt, ", ")?;
+                }
+                write!(fmt, "{}: {}", *key, *value)?;
+            }
+            write!(fmt, "}}")
+        }
     }
 }
 
-impl Hash for Result {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        
-        self.string.hash(state);
-        self.integer.hash(state);
-        self.list.hash(state);
-        self.bytes.hash(state);
-
-        let dict = match &self.dictionary {
-            Some(d)=> d,
-            None => return,
-        };
-
-        for (key, value) in dict {
-            key.hash(state);
-            value.hash(state);
-        }
-    }
+#[inline]
+fn fmt_bytestring(s: &[u8], fmt: &mut fmt::Formatter) -> fmt::Result {
+  match str::from_utf8(s) {
+    Ok(utf8_str) => write!(fmt, "s\"{}\"", utf8_str),
+    Err(..) => write!(fmt, "s{:?}", s),
+  }
 }

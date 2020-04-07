@@ -1,17 +1,17 @@
-use std::collections::HashMap;
 use std::{str, cmp};
 
-use crate::bencoding::result::Result;
+use crate::bencoding::result::{Bencode, ListVec, DictMap};
+use crate::bencoding::byte_string;
 
-pub fn decode(data: &[u8]) -> Result {
+pub fn decode(data: &[u8]) -> Bencode {
     decode_internal(data, 0).0
 }
 
-fn decode_internal(data: &[u8], index: usize) -> (Result, usize) {
+fn decode_internal(data: &[u8], index: usize) -> (Bencode, usize) {
     let numbers = [b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9'];
     let code = match data.get(index) {
         Some(&r) => r,
-        None => return (Result::empty(), 0),
+        None => return (Bencode::Empty, 0),
     };
 
     if numbers.contains(&code) {
@@ -23,72 +23,65 @@ fn decode_internal(data: &[u8], index: usize) -> (Result, usize) {
     } else if code == b'd' {
         decode_dictionary(data, index)
     } else {
-        (Result::empty(), 0)
+        (Bencode::Empty, 0)
     }
 }
 
-fn decode_str(data: &[u8], index: usize) -> (Result, usize) {
+fn decode_str(data: &[u8], index: usize) -> (Bencode, usize) {
     let slice = data.get(index..).unwrap();
     let i = match slice.iter().position(|&r| r == b':') {
         Some(val) => val,
-        None => return (Result::empty(), 0),
+        None => return (Bencode::Empty, 0),
     };
 
     let length_bytes = slice.get(..i).unwrap();
     let length_str = str::from_utf8(&length_bytes).unwrap();
     let length = match length_str.parse::<usize>() {
         Ok(val) => val,
-        Err(_) => return (Result::empty(), 0),
+        Err(_) => return (Bencode::Empty, 0),
     };
     let length = cmp::min(length, slice.len() - i - 1);
 
     if length == 0 {
-        return (Result::string("".to_string()), index+i+1)
+        return (Bencode::ByteString(Vec::<u8>::new()), index+i+1)
     };
 
     let s = match slice.get((i+1)..(i+1+length)) {
         Some(val) => val,
-        None => return (Result::empty(), 0),
+        None => return (Bencode::Empty, 0),
     };
 
-    let utf8_str = match str::from_utf8(s) {
-        Ok(val) => val.to_string(),
-        Err(_) => {
-            return (Result::bytes(s.to_vec()), index+i+1+length);
-        },
-    };
-
-    (Result::string(utf8_str), index+i+1+length)
+    (Bencode::ByteString(s.to_vec()), index+i+1+length)
 }
 
-fn decode_int(data: &[u8], index: usize) -> (Result, usize) {
+fn decode_int(data: &[u8], index: usize) -> (Bencode, usize) {
     let slice = data.get(index..).unwrap();
     let i = match slice.iter().position(|&r| r == b'e') {
         Some(val) => val,
-        None => return (Result::empty(), 0),
+        None => return (Bencode::Empty, 0),
     };
 
     let number_bytes = slice.get(1..i).unwrap();
     let number_str = str::from_utf8(&number_bytes).unwrap();
-    let number = match number_str.parse::<isize>() {
+    let number = match number_str.parse::<i64>() {
         Ok(val) => val,
-        Err(_) => return (Result::empty(), 0),
+        Err(_) => return (Bencode::Empty, 0),
     };
 
-    (Result::integer(number), index + i + 1)
+    (Bencode::Number(number), index + i + 1)
 }
 
-fn decode_list(data: &[u8], index: usize) -> (Result, usize) {
+fn decode_list(data: &[u8], index: usize) -> (Bencode, usize) {
     let slice = data.get(index..).unwrap();
-    let mut list = Vec::<Result>::new();
+    let mut list = ListVec::new();
     let mut i = 1;
-    let mut item : Result;
+    let mut item : Bencode;
 
     loop {
         match slice.get(i) {
             Some(b'e') => break,
             Some(_) => {},
-            None => return (Result::list(list), index + i),
+            None => return (Bencode::List(list), index + i),
         }
 
         let result = decode_internal(slice, i);
@@ -98,27 +91,31 @@ fn decode_list(data: &[u8], index: usize) -> (Result, usize) {
         list.push(item);
     }
 
-    (Result::list(list), index + i)
+    (Bencode::List(list), index + i)
 }
 
-fn decode_dictionary(data: &[u8], index: usize) -> (Result, usize) {
+fn decode_dictionary(data: &[u8], index: usize) -> (Bencode, usize) {
     let slice = data.get(index..).unwrap();
-    let mut dict = HashMap::<Result, Result>::new();
+    let mut dict = DictMap::new();
     let mut i = 1;
-    let mut key : Result;
-    let mut value : Result;
+    let mut key : byte_string::ByteString;
+    let mut value : Bencode;
 
     loop {
         match slice.get(i) {
             Some(b'e') => break,
             Some(_) => {},
-            None => return (Result::dictionary(dict), index + i),
+            None => return (Bencode::Dict(dict), index + i),
         }
 
         let result = decode_internal(slice, i);
 
-        key = result.0;
         i = result.1;
+
+        key = match result.0 {
+            Bencode::ByteString(v) => byte_string::ByteString::from_vec(v),
+            _ => return (Bencode::Dict(dict), index + i),
+        };
 
         let result = decode_internal(slice, i); 
 
@@ -128,7 +125,7 @@ fn decode_dictionary(data: &[u8], index: usize) -> (Result, usize) {
         dict.insert(key, value);
     }
 
-    (Result::dictionary(dict), index + i)
+    (Bencode::Dict(dict), index + i)
 }
 
 #[cfg(test)]
@@ -139,10 +136,8 @@ mod tests {
     fn test_can_decode_an_empty_dictionary() {
         let s = b"de";
         let result = decode(s);
-        let d = HashMap::<Result, Result>::new();
 
-        assert!(result.is_dictionary());
-        assert_eq!(Some(d), result.dictionary);
+        assert_eq!(Bencode::Dict(DictMap::new()), result);
     }
 
     #[test]
@@ -150,8 +145,21 @@ mod tests {
         let s = b"d";
         let result = decode(s);
 
-        assert!(result.is_dictionary());
-        assert_eq!(Some(HashMap::<Result, Result>::new()), result.dictionary);
+        assert_eq!(Bencode::Dict(DictMap::new()), result);
+    }
+
+    #[test]
+    fn test_can_decode_a_dictionary_with_invalid_key() {
+        let s = b"d3:fooi-4ei3e4:spam";
+        let result = decode(s);
+
+        let mut d = DictMap::new();
+        d.insert(
+            byte_string::ByteString::from_vec(b"foo".to_vec()),
+            Bencode::Number(-4)
+        );
+
+        assert_eq!(Bencode::Dict(d), result);
     }
 
     #[test]
@@ -159,11 +167,13 @@ mod tests {
         let s = b"d4:spami3ee";
         let result = decode(s);
 
-        let mut d = HashMap::<Result, Result>::new();
-        d.insert(Result::string("spam".to_string()), Result::integer(3));
+        let mut d = DictMap::new();
+        d.insert(
+            byte_string::ByteString::from_vec(b"spam".to_vec()),
+            Bencode::Number(3)
+        );
 
-        assert!(result.is_dictionary());
-        assert_eq!(Some(d), result.dictionary);
+        assert_eq!(Bencode::Dict(d), result);
     }
 
     #[test]
@@ -172,16 +182,21 @@ mod tests {
         let result = decode(s);
 
         let v = vec![
-            Result::string("spam".to_string()),
-            Result::integer(3),
+            Bencode::ByteString(b"spam".to_vec()),
+            Bencode::Number(3),
         ];
 
-        let mut d = HashMap::<Result, Result>::new();
-        d.insert(Result::string("spam".to_string()), Result::integer(3));
-        d.insert(Result::string("foo".to_string()), Result::list(v));
+        let mut d = DictMap::new();
+        d.insert(
+            byte_string::ByteString::from_vec(b"spam".to_vec()),
+            Bencode::Number(3)
+        );
+        d.insert(
+            byte_string::ByteString::from_vec(b"foo".to_vec()),
+            Bencode::List(v)
+        );
 
-        assert!(result.is_dictionary());
-        assert_eq!(Some(d), result.dictionary);
+        assert_eq!(Bencode::Dict(d), result);
     }
 
     #[test]
@@ -189,8 +204,7 @@ mod tests {
         let s = b"le";
         let result = decode(s);
 
-        assert!(result.is_list());
-        assert_eq!(Some(Vec::<Result>::new()), result.list);
+        assert_eq!(Bencode::List(ListVec::new()), result)
     }
 
     #[test]
@@ -198,8 +212,7 @@ mod tests {
         let s = b"l";
         let result = decode(s);
 
-        assert!(result.is_list());
-        assert_eq!(Some(Vec::<Result>::new()), result.list);
+        assert_eq!(Bencode::List(ListVec::new()), result)
     }
 
     #[test]
@@ -208,11 +221,10 @@ mod tests {
         let result = decode(s);
 
         let v = vec![
-            Result::integer(3),
+            Bencode::Number(3),
         ];
 
-        assert!(result.is_list());
-        assert_eq!(Some(v), result.list);
+        assert_eq!(Bencode::List(v), result)
     }
 
     #[test]
@@ -221,12 +233,11 @@ mod tests {
         let result = decode(s);
 
         let v = vec![
-            Result::string("spam".to_string()),
-            Result::integer(3),
+            Bencode::ByteString(b"spam".to_vec()),
+            Bencode::Number(3),
         ];
 
-        assert!(result.is_list());
-        assert_eq!(Some(v), result.list);
+        assert_eq!(Bencode::List(v), result)
     }
 
     #[test]
@@ -235,13 +246,12 @@ mod tests {
         let result = decode(s);
 
         let l = vec![
-            Result::string("spam".to_string()),
-            Result::integer(3),
+            Bencode::ByteString(b"spam".to_vec()),
+            Bencode::Number(3),
         ];
-        let v = vec![Result::list(l)];
+        let v = vec![Bencode::List(l)];
 
-        assert!(result.is_list());
-        assert_eq!(Some(v), result.list);
+        assert_eq!(Bencode::List(v), result)
     }
 
     #[test]
@@ -249,8 +259,7 @@ mod tests {
         let s = b"i13e";
         let result = decode(s);
 
-        assert!(result.is_integer());
-        assert_eq!(Some(13), result.integer);
+        assert_eq!(Bencode::Number(13), result);
     }
 
     #[test]
@@ -258,8 +267,7 @@ mod tests {
         let s = b"i-137e";
         let result = decode(s);
 
-        assert!(result.is_integer());
-        assert_eq!(Some(-137), result.integer);
+        assert_eq!(Bencode::Number(-137), result);
     }
 
     #[test]
@@ -267,8 +275,7 @@ mod tests {
         let s = b"4:spam";
         let result = decode(s);
 
-        assert!(result.is_string());
-        assert_eq!(Some("spam".to_string()), result.string);
+        assert_eq!(Bencode::ByteString(b"spam".to_vec()), result);
     }
 
     #[test]
@@ -276,8 +283,7 @@ mod tests {
         let s = b"10:1234567";
         let result = decode(s);
 
-        assert!(result.is_string());
-        assert_eq!(Some("1234567".to_string()), result.string);
+        assert_eq!(Bencode::ByteString(b"1234567".to_vec()), result);
     }
 
     #[test]
@@ -285,8 +291,7 @@ mod tests {
         let s = b"4:";
         let result = decode(s);
 
-        assert!(result.is_string());
-        assert_eq!(Some("".to_string()), result.string);
+        assert_eq!(Bencode::ByteString(b"".to_vec()), result);
     }
 
     #[test]
@@ -294,8 +299,7 @@ mod tests {
         let s = b"0:";
         let result = decode(s);
 
-        assert!(result.is_string());
-        assert_eq!(Some("".to_string()), result.string);
+        assert_eq!(Bencode::ByteString(b"".to_vec()), result);
     }
 
     #[test]
@@ -303,8 +307,7 @@ mod tests {
         let s = b"";
         let result = decode(s);
 
-        assert!(result.is_empty());
-        assert_eq!(Result::empty(), result);
+        assert_eq!(Bencode::Empty, result);
     }
 
     #[test]
@@ -313,7 +316,6 @@ mod tests {
         let result = decode(s);
         let bytes = vec![195, 40];
 
-        assert!(result.is_bytes());
-        assert_eq!(Result::bytes(bytes), result);
+        assert_eq!(Bencode::ByteString(bytes), result);
     }
 }

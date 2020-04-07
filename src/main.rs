@@ -8,5 +8,5 @@ fn main() {
 
     let input: &[u8] = result.as_ref();
     let result = bencoding::decoder::decode(input);
-    println!("{:?}", result);
+    println!("{}", result);
 }
