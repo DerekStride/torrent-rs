@@ -1,6 +1,6 @@
 use std::{str, cmp};
 
-use crate::bencoding::result::{Bencode, ListVec, DictMap};
+use crate::bencoding::bencode::{Bencode, ListVec, DictMap};
 use crate::bencoding::byte_string;
 
 pub fn decode(data: &[u8]) -> Bencode {
