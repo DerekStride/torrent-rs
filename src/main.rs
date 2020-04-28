@@ -1,8 +1,10 @@
 use std::{str, fs};
+use std::net::Ipv4Addr;
 use sha1::Digest;
 use hyper;
 use tokio;
 use percent_encoding;
+use byteorder::{ByteOrder, BigEndian};
 
 mod bencoding;
 
@@ -66,9 +68,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let buf = hyper::body::to_bytes(resp).await?;
     let vec = buf.to_vec();
 
-    let tracker_info = bencoding::decoder::decode(vec);
+    let mut tracker_info = match bencoding::decoder::decode(vec) {
+        Bencode::Dict(dict) => dict,
+        _ => panic!("Could not decode the torrent file."),
+    };
 
-    println!("tracker_info: {}", tracker_info);
+    let peers = match tracker_info.remove(&ByteString::from_str("peers")) {
+        Some(info) => info,
+        None => panic!("\"info\" key did not exist in torrent file."),
+    };
+
+    let peers_array = match peers {
+        Bencode::ByteString(s) => s,
+        _ => panic!("\"peers\" wasn't a ByteString."),
+    };
+
+    let mut ip_addrs = Vec::<String>::new();
+
+    for peer in peers_array.chunks(6) {
+        let addr = Ipv4Addr::from(BigEndian::read_u32(&peer[..4]));
+        let port = BigEndian::read_u16(&peer[4..]);
+        ip_addrs.push(format!("{}:{}", addr, port));
+    }
+
+    println!("peers_array: {:?}", ip_addrs);
     
     Ok(())
 }

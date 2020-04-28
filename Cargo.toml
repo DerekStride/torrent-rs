@@ -11,3 +11,4 @@ hyper = "0.13"
 tokio = { version = "0.2", features = ["full"] }
 http = "0.2"
 percent-encoding = "2.1"
+byteorder = "1.3"
