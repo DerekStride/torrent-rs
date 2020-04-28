@@ -1,12 +1,16 @@
-use std::fs;
+use std::{str, fs};
 use sha1::Digest;
+use hyper;
+use tokio;
+use percent_encoding;
 
 mod bencoding;
 
 use bencoding::bencode::Bencode;
 use bencoding::byte_string::ByteString;
 
-fn main() {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let filename = "tmp/raspbian-buster-lite.zip.torrent";
     let input = fs::read(filename).expect("Unable to read file");
 
@@ -24,6 +28,47 @@ fn main() {
     let encoded_info = bencoding::encoder::encode(torrent_info);
     hasher.input(encoded_info);
     let sha1 = hasher.result();
+    let sha1_encoded = percent_encoding::percent_encode(sha1.as_slice(), percent_encoding::NON_ALPHANUMERIC).to_string();
 
-    println!("{:?}", sha1);
+    let announce_str = match torrent.remove(&ByteString::from_str("announce")) {
+        Some(info) => info,
+        None => panic!("\"announce\" key did not exist in torrent file."),
+    };
+
+    let mut announce_vec = match announce_str {
+        Bencode::ByteString(s) => s,
+        _ => panic!("\"announce\" key was not a string."),
+    };
+
+    for &byte in b"?info_hash=" {
+        announce_vec.push(byte);
+    }
+
+    for &byte in sha1_encoded.as_bytes() {
+        announce_vec.push(byte);
+    }
+
+    let announce_url = match str::from_utf8(announce_vec.as_slice()) {
+        Ok(v) => v,
+        Err(_) => panic!("alert"),
+    };
+    
+    let uri: hyper::Uri = announce_url.parse().unwrap();
+
+    let client = hyper::Client::new();
+
+    let resp = client.get(uri).await?;
+    
+    // And then, if the request gets a response...
+    println!("status: {}", resp.status());
+
+    // Concatenate the body stream into a single buffer...
+    let buf = hyper::body::to_bytes(resp).await?;
+    let vec = buf.to_vec();
+
+    let tracker_info = bencoding::decoder::decode(vec);
+
+    println!("tracker_info: {}", tracker_info);
+    
+    Ok(())
 }
