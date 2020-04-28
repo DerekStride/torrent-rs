@@ -8,8 +8,7 @@ use bencoding::byte_string::ByteString;
 
 fn main() {
     let filename = "tmp/raspbian-buster-lite.zip.torrent";
-    let result = fs::read(filename).expect("Unable to read file");
-    let input: &[u8] = result.as_ref();
+    let input = fs::read(filename).expect("Unable to read file");
 
     let mut torrent = match bencoding::decoder::decode(input) {
         Bencode::Dict(dict) => dict,
