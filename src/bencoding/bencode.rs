@@ -27,22 +27,24 @@ impl Bencode {
     //     }
     // }
 
-    // pub fn get_bytestring(&self, key: &str) -> Result<Vec<u8>, String> {
-    //     let dict = match self {
-    //         Bencode::Dict(d) => d,
-    //         _ => return Err("Bencode is not a dict".to_string()),
-    //     };
+    pub fn get_bytestring(&self, key: &str) -> Result<Vec<u8>, String> {
+        let dict = match self {
+            Bencode::Dict(d) => d,
+            _ => return Err("Bencode is not a dict".to_string()),
+        };
 
-    //     let bencode_value = match dict.get(&ByteString::from_str(key)) {
-    //         Some(value) => value,
-    //         None => return Err(format!("\"{}\" key is not present in torrent file.", key)),
-    //     };
+        let bencode_value = match dict.get(&ByteString::from_str(key)) {
+            Some(value) => value,
+            None => return Err(format!("\"{}\" key is not present in torrent file.", key)),
+        };
 
-    //     match bencode_value {
-    //         Bencode::ByteString(s) => Ok(s),
-    //         _ => return Err(format!("\"{}\" value is not a ByteString", key)),
-    //     }
-    // }
+        match bencode_value {
+            Bencode::ByteString(s) => Ok(*s), // <--- Error
+            // cannot move out of `*s` which is behind a shared reference
+            // move occurs because `*s` has type `std::vec::Vec<u8>`, which does not implement the `Copy` traitrustc(E0507)
+            _ => return Err(format!("\"{}\" value is not a ByteString", key)),
+        }
+    }
 
     pub fn get_string(&self, key: &str) -> Result<String, String> {
         let dict = match self {
