@@ -7,6 +7,7 @@ use percent_encoding;
 use byteorder::{ByteOrder, BigEndian};
 
 mod bencoding;
+mod torrent;
 
 use bencoding::bencode::Bencode;
 use bencoding::byte_string::ByteString;
@@ -16,7 +17,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let filename = "tmp/raspbian-buster-lite.zip.torrent";
     let input = fs::read(filename).expect("Unable to read file");
 
-    let mut torrent = match bencoding::decoder::decode(input) {
+    let data = bencoding::decoder::decode(input);
+
+    println!("{}", data);
+
+    let mut torrent = match data {
         Bencode::Dict(dict) => dict,
         _ => panic!("Could not decode the torrent file."),
     };
