@@ -18,8 +18,7 @@ impl TorrentInfo {
         let piece_length = input.get_number("piece_length")?;
         let private_str = input.get_string("private")?;
         let private = private_str.as_str() == "1";
-        let pieces = input.get_bytestring("pieces")?;
-        let pieces = Vec::<u8>::new();
+        let pieces = input.remove_bytestring("pieces")?;
 
         Ok(
             Self {

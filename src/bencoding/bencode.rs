@@ -15,34 +15,38 @@ pub type ListVec = Vec<Bencode>;
 pub type DictMap = BTreeMap<ByteString, Bencode>;
 
 impl Bencode {
-    // pub fn get(self, key: &str) -> Result<Bencode, String> {
-    //     let dict = match self {
-    //         Bencode::Dict(d) => d,
-    //         _ => return Err("Bencode is not a dict".to_string()),
-    //     };
-
-    //     match dict.get(&ByteString::from_str(key)) {
-    //         Some(value) => Ok(*value),
-    //         None => return Err(format!("\"{}\" key is not present in torrent file.", key)),
-    //     }
-    // }
-
-    pub fn get_bytestring(&self, key: &str) -> Result<Vec<u8>, String> {
-        let dict = match self {
+    pub fn remove(self, key: &str) -> Result<Bencode, String> {
+        let mut dict = match self {
             Bencode::Dict(d) => d,
             _ => return Err("Bencode is not a dict".to_string()),
         };
 
-        let bencode_value = match dict.get(&ByteString::from_str(key)) {
-            Some(value) => value,
+        match dict.remove(&ByteString::from_str(key)) {
+            Some(value) => Ok(value),
             None => return Err(format!("\"{}\" key is not present in torrent file.", key)),
+        }
+    }
+
+    pub fn remove_bytestring(self, key: &str) -> Result<Vec<u8>, String> {
+        let mut dict = match self {
+            Bencode::Dict(d) => d,
+            _ => return Err("Bencode is not a dict".to_string()),
         };
 
-        match bencode_value {
-            Bencode::ByteString(s) => Ok(*s), // <--- Error
-            // cannot move out of `*s` which is behind a shared reference
-            // move occurs because `*s` has type `std::vec::Vec<u8>`, which does not implement the `Copy` traitrustc(E0507)
-            _ => return Err(format!("\"{}\" value is not a ByteString", key)),
+        let index = &ByteString::from_str(key);
+
+        if let Some(value) = dict.get(index) {
+            if let Bencode::ByteString(_) = value {
+                match dict.remove(index) {
+                    Some(Bencode::ByteString(s)) => Ok(s),
+                    Some(_) => Err(format!("Something went wrong removing \"{}\" from Bencode struct, value was not a ByteString.", key)),
+                    None => Err(format!("Something went wrong removing \"{}\" from Bencode struct.", key)),
+                }
+            } else {
+                Err(format!("\"{}\" value is not a ByteString", key))
+            }
+        } else {
+            Err(format!("\"{}\" key is not present in torrent file.", key))
         }
     }
 

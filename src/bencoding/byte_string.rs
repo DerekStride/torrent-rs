@@ -1,5 +1,4 @@
 use std::{str, fmt};
-use std::str::Utf8Error;
 
 #[derive(Eq, PartialEq, Clone, Ord, PartialOrd, Hash, Debug)]
 pub struct ByteString(Vec<u8>);
