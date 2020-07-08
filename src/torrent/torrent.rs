@@ -15,9 +15,9 @@ pub struct Torrent {
 impl Torrent {
     pub fn from(input: Bencode) -> Result<Self, String> {        
         let announce = input.get_string("announce")?;
-        let created_by = input.get_string("created_by")?;
+        let created_by = input.get_string("created by")?;
         let encoding = input.get_string("encoding")?;
-        let creation_date = input.get_number("creation_date")?;
+        let creation_date = input.get_number("creation date")?;
         let info = TorrentInfo::from(input.remove("info")?)?;
         
         Ok(
@@ -58,31 +58,31 @@ mod tests {
     #[test]
     fn test_err_when_announce_is_present() {
         let result = torrent(b"d8:announce3:yese");
-        assert_eq!(Err("\"created_by\" key is not present in torrent file.".to_string()), result);
+        assert_eq!(Err("\"created by\" key is not present in torrent file.".to_string()), result);
     }
 
     #[test]
     fn test_err_when_created_by_is_present() {
-        let result = torrent(b"d8:announce3:yes10:created_by5:dereke");
+        let result = torrent(b"d8:announce3:yes10:created by5:dereke");
         assert_eq!(Err("\"encoding\" key is not present in torrent file.".to_string()), result);
     }
 
     #[test]
     fn test_err_when_encoding_is_present() {
-        let result = torrent(b"d8:announce3:yes10:created_by5:derek8:encoding5:UTF-8e");
-        assert_eq!(Err("\"creation_date\" key is not present in torrent file.".to_string()), result);
+        let result = torrent(b"d8:announce3:yes10:created by5:derek8:encoding5:UTF-8e");
+        assert_eq!(Err("\"creation date\" key is not present in torrent file.".to_string()), result);
     }
 
     #[test]
     fn test_err_when_creation_date_is_present() {
-        let result = torrent(b"d8:announce3:yes10:created_by5:derek8:encoding5:UTF-813:creation_datei170ee");
+        let result = torrent(b"d8:announce3:yes10:created by5:derek8:encoding5:UTF-813:creation datei170ee");
         assert_eq!(Err("\"info\" key is not present in torrent file.".to_string()), result);
     }
 
     #[test]
     fn test_ok_when_all_values_are_present() {
         let result = torrent(
-            b"d8:announce3:yes10:created_by5:derek8:encoding5:UTF-813:creation_datei170e4:infod6:lengthi4e4:name5:derek12:piece_lengthi100e7:private1:16:pieces3:z\xc3\x28ee"
+            b"d8:announce3:yes10:created by5:derek8:encoding5:UTF-813:creation datei170e4:infod6:lengthi4e4:name5:derek12:piece lengthi100e6:pieces3:z\xc3\x287:private1:1ee"
         );
 
         let expected_info = TorrentInfo {

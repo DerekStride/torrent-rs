@@ -15,7 +15,7 @@ impl TorrentInfo {
     pub fn from(input: Bencode) -> Result<Self, String> {
         let length = input.get_number("length")?;
         let name = input.get_string("name")?;
-        let piece_length = input.get_number("piece_length")?;
+        let piece_length = input.get_number("piece length")?;
         let private_str = input.get_string("private")?;
         let private = private_str.as_str() == "1";
         let pieces = input.remove_bytestring("pieces")?;
@@ -64,25 +64,25 @@ mod tests {
     #[test]
     fn test_err_when_name_is_present() {
         let result = torrent_info(b"d6:lengthi4e4:name5:dereke");
-        assert_eq!(Err("\"piece_length\" key is not present in torrent file.".to_string()), result);
+        assert_eq!(Err("\"piece length\" key is not present in torrent file.".to_string()), result);
     }
 
     #[test]
     fn test_err_when_piece_length_is_present() {
-        let result = torrent_info(b"d6:lengthi4e4:name5:derek12:piece_lengthi100ee");
+        let result = torrent_info(b"d6:lengthi4e4:name5:derek12:piece lengthi100ee");
         assert_eq!(Err("\"private\" key is not present in torrent file.".to_string()), result);
     }
 
     #[test]
     fn test_err_when_private_is_present() {
-        let result = torrent_info(b"d6:lengthi4e4:name5:derek12:piece_lengthi100e7:private1:1e");
+        let result = torrent_info(b"d6:lengthi4e4:name5:derek12:piece lengthi100e7:private1:1e");
         assert_eq!(Err("\"pieces\" key is not present in torrent file.".to_string()), result);
     }
 
     #[test]
     fn test_ok_when_all_values_are_present() {
         let result = torrent_info(
-            b"d6:lengthi4e4:name5:derek12:piece_lengthi100e7:private1:16:pieces3:z\xc3\x28e"
+            b"d6:lengthi4e4:name5:derek12:piece lengthi100e6:pieces3:z\xc3\x287:private1:1e"
         );
 
         let expected = TorrentInfo {
