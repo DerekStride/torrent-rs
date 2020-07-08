@@ -1,59 +1,25 @@
-use std::{str, fs};
+use std::fs;
 use std::net::Ipv4Addr;
-use sha1::Digest;
 use hyper;
 use tokio;
-use percent_encoding;
 use byteorder::{ByteOrder, BigEndian};
 
 mod bencoding;
+mod torrent;
 
 use bencoding::bencode::Bencode;
 use bencoding::byte_string::ByteString;
+use torrent::torrent::Torrent;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let filename = "tmp/raspbian-buster-lite.zip.torrent";
     let input = fs::read(filename).expect("Unable to read file");
 
-    let mut torrent = match bencoding::decoder::decode(input) {
-        Bencode::Dict(dict) => dict,
-        _ => panic!("Could not decode the torrent file."),
-    };
+    let data = bencoding::decoder::decode(input);
+    let torrent = Torrent::from(data)?;
 
-    let torrent_info = match torrent.remove(&ByteString::from_str("info")) {
-        Some(info) => info,
-        None => panic!("\"info\" key did not exist in torrent file."),
-    };
-
-    let mut hasher = sha1::Sha1::new();
-    let encoded_info = bencoding::encoder::encode(torrent_info);
-    hasher.input(encoded_info);
-    let sha1 = hasher.result();
-    let sha1_encoded = percent_encoding::percent_encode(sha1.as_slice(), percent_encoding::NON_ALPHANUMERIC).to_string();
-
-    let announce_str = match torrent.remove(&ByteString::from_str("announce")) {
-        Some(info) => info,
-        None => panic!("\"announce\" key did not exist in torrent file."),
-    };
-
-    let mut announce_vec = match announce_str {
-        Bencode::ByteString(s) => s,
-        _ => panic!("\"announce\" key was not a string."),
-    };
-
-    for &byte in b"?info_hash=" {
-        announce_vec.push(byte);
-    }
-
-    for &byte in sha1_encoded.as_bytes() {
-        announce_vec.push(byte);
-    }
-
-    let announce_url = match str::from_utf8(announce_vec.as_slice()) {
-        Ok(v) => v,
-        Err(_) => panic!("alert"),
-    };
+    let announce_url = torrent.announce_url()?;
     
     let uri: hyper::Uri = announce_url.parse().unwrap();
 
@@ -68,14 +34,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let buf = hyper::body::to_bytes(resp).await?;
     let vec = buf.to_vec();
 
-    let mut tracker_info = match bencoding::decoder::decode(vec) {
+    let response_data = bencoding::decoder::decode(vec);
+    println!("tracker_info: {}", response_data);
+
+    let mut tracker_info = match response_data {
         Bencode::Dict(dict) => dict,
         _ => panic!("Could not decode the torrent file."),
     };
 
     let peers = match tracker_info.remove(&ByteString::from_str("peers")) {
         Some(info) => info,
-        None => panic!("\"info\" key did not exist in torrent file."),
+        None => panic!("\"peers\" key did not exist in torrent file."),
     };
 
     let peers_array = match peers {

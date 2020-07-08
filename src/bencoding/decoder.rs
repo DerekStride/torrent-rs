@@ -318,4 +318,33 @@ mod tests {
 
         assert_eq!(Bencode::ByteString(bytes), result);
     }
+
+    #[test]
+    fn test_key_after_bytestring() {
+        let s = b"d3:foo3:bar4:infod6:pieces3:z\xc3\x287:private1:1ee".to_vec();
+        let result = decode(s);
+        let bytes = vec![122, 195, 40];
+
+        let mut info = DictMap::new();
+        info.insert(
+            byte_string::ByteString::from_vec(b"pieces".to_vec()),
+            Bencode::ByteString(bytes),
+        );
+        info.insert(
+            byte_string::ByteString::from_vec(b"private".to_vec()),
+            Bencode::ByteString(b"1".to_vec()),
+        );
+
+        let mut d = DictMap::new();
+        d.insert(
+            byte_string::ByteString::from_vec(b"foo".to_vec()),
+            Bencode::ByteString(b"bar".to_vec()),
+        );
+        d.insert(
+            byte_string::ByteString::from_vec(b"info".to_vec()),
+            Bencode::Dict(info),
+        );
+
+        assert_eq!(Bencode::Dict(d), result);
+    }
 }
