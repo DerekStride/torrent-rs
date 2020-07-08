@@ -136,6 +136,7 @@ fn format(fmt: &mut fmt::Formatter, v: &Bencode) -> fmt::Result {
 fn fmt_bytestring(s: &[u8], fmt: &mut fmt::Formatter) -> fmt::Result {
   match str::from_utf8(s) {
     Ok(utf8_str) => write!(fmt, "s\"{}\"", utf8_str),
+    // Err(..) => write!(fmt, "s[{}]", s.len()),
     Err(..) => write!(fmt, "s{:?}", s),
   }
 }

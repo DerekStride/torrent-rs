@@ -11,6 +11,7 @@ mod torrent;
 
 use bencoding::bencode::Bencode;
 use bencoding::byte_string::ByteString;
+use torrent::torrent::Torrent;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -19,7 +20,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let data = bencoding::decoder::decode(input);
 
-    println!("{}", data);
+    // let mut map = match data {
+    //     Bencode::Dict(m) => m,
+    //     _ => panic!("alert!"),
+    // };
+
+    // map.remove(&ByteString::from_str("info"));
+    // let torrent = Torrent::from(data);
+
+    // println!("{}", data);
 
     let mut torrent = match data {
         Bencode::Dict(dict) => dict,
@@ -73,14 +82,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let buf = hyper::body::to_bytes(resp).await?;
     let vec = buf.to_vec();
 
-    let mut tracker_info = match bencoding::decoder::decode(vec) {
+    let response_data = bencoding::decoder::decode(vec);
+    println!("tracker_info: {}", response_data);
+
+    let mut tracker_info = match response_data {
         Bencode::Dict(dict) => dict,
         _ => panic!("Could not decode the torrent file."),
     };
 
     let peers = match tracker_info.remove(&ByteString::from_str("peers")) {
         Some(info) => info,
-        None => panic!("\"info\" key did not exist in torrent file."),
+        None => panic!("\"peers\" key did not exist in torrent file."),
     };
 
     let peers_array = match peers {
