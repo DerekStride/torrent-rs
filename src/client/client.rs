@@ -4,6 +4,7 @@ use std::result::Result;
 use crate::torrent::torrent::Torrent;
 use crate::torrent::tracker_info::TrackerInfo;
 use crate::bencoding::decoder;
+use crate::client::error::Error;
 
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub struct Client {
@@ -19,22 +20,16 @@ impl Client {
         }
     }
 
-    pub async fn tracker_info(&self) -> Result<TrackerInfo, String> {
+    pub async fn tracker_info(&self) -> Result<TrackerInfo, Error> {
         let announce_url = self.torrent.announce_url()?;
-        let uri: hyper::Uri = announce_url.parse().unwrap();
+        let uri: hyper::Uri = announce_url.parse()?;
         let client = hyper::Client::new();
 
-        let resp = match client.get(uri).await {
-            Ok(r) => r,
-            Err(e) => return Err(format!("{}", e)),
-        };
-        let buf = match hyper::body::to_bytes(resp).await {
-            Ok(b) => b,
-            Err(e) => return Err(format!("{}", e)),
-        };
-
+        let resp = client.get(uri).await?;
+        let buf = hyper::body::to_bytes(resp).await?;
         let response_data = decoder::decode(buf.to_vec());
-        TrackerInfo::from(response_data)
+
+        Ok(TrackerInfo::from(response_data)?)
     }
 }
 
