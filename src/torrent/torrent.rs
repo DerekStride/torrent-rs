@@ -3,6 +3,7 @@ use std::result::Result;
 
 use crate::bencoding::bencode::Bencode;
 use crate::torrent::torrent_info::TorrentInfo;
+use crate::torrent::error::Error;
 
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub struct Torrent {
@@ -14,7 +15,7 @@ pub struct Torrent {
 }
 
 impl Torrent {
-    pub fn from(input: Bencode) -> Result<Self, String> {        
+    pub fn from(input: Bencode) -> Result<Self, Error> {        
         let announce = input.get_string("announce")?;
         let created_by = input.get_string("created by")?;
         let encoding = input.get_string("encoding")?;
@@ -32,7 +33,7 @@ impl Torrent {
         )
     }
 
-    pub fn announce_url(&self) -> Result<String, String> {
+    pub fn announce_url(&self) -> Result<String, Error> {
         let mut announce_vec = self.announce.as_bytes().to_vec();
 
         for &byte in b"?info_hash=" {
@@ -45,7 +46,7 @@ impl Torrent {
 
         match str::from_utf8(announce_vec.as_slice()) {
             Ok(v) => Ok(v.to_string()),
-            Err(_) => Err("Failed to parse url.".to_string()),
+            Err(_) => Err(Error::new("Failed to parse url.".to_string())),
         }
     }
 }
@@ -71,46 +72,54 @@ mod tests {
     use super::*;
     use crate::bencoding::decoder::decode;
 
-    fn torrent(data: &[u8]) -> Result<Torrent, String> {
+    fn torrent(data: &[u8]) -> Result<Torrent, Error> {
         Torrent::from(
             decode(data.to_vec())
         )
     }
 
+    fn assert_result_matches_error(msg: String, result: Result<Torrent, Error>) {
+        let actual = match result {
+            Ok(_) => panic!("Unexpected Ok value."),
+            Err(e) => e,
+        };
+        assert_eq!(msg, format!("{}", actual));
+    }
+
     #[test]
     fn test_err_when_input_is_not_a_dictionary() {
         let result = torrent(b"le");
-        assert_eq!(Err("Bencode is not a dict.".to_string()), result);
+        assert_result_matches_error("Bencode is not a dict.".to_string(), result);
     }
 
     #[test]
     fn test_err_when_input_is_an_empty_dictionary() {
         let result = torrent(b"de");
-        assert_eq!(Err("\"announce\" key is not present in torrent file.".to_string()), result);
+        assert_result_matches_error("\"announce\" key is not present in torrent file.".to_string(), result);
     }
 
     #[test]
     fn test_err_when_announce_is_present() {
         let result = torrent(b"d8:announce3:yese");
-        assert_eq!(Err("\"created by\" key is not present in torrent file.".to_string()), result);
+        assert_result_matches_error("\"created by\" key is not present in torrent file.".to_string(), result);
     }
 
     #[test]
     fn test_err_when_created_by_is_present() {
         let result = torrent(b"d8:announce3:yes10:created by5:dereke");
-        assert_eq!(Err("\"encoding\" key is not present in torrent file.".to_string()), result);
+        assert_result_matches_error("\"encoding\" key is not present in torrent file.".to_string(), result);
     }
 
     #[test]
     fn test_err_when_encoding_is_present() {
         let result = torrent(b"d8:announce3:yes10:created by5:derek8:encoding5:UTF-8e");
-        assert_eq!(Err("\"creation date\" key is not present in torrent file.".to_string()), result);
+        assert_result_matches_error("\"creation date\" key is not present in torrent file.".to_string(), result);
     }
 
     #[test]
     fn test_err_when_creation_date_is_present() {
         let result = torrent(b"d8:announce3:yes10:created by5:derek8:encoding5:UTF-813:creation datei170ee");
-        assert_eq!(Err("\"info\" key is not present in torrent file.".to_string()), result);
+        assert_result_matches_error("\"info\" key is not present in torrent file.".to_string(), result);
     }
 
     #[test]

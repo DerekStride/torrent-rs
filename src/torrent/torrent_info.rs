@@ -7,6 +7,8 @@ use crate::bencoding;
 use crate::bencoding::byte_string::ByteString;
 use crate::bencoding::bencode::Bencode;
 
+use crate::torrent::error::Error;
+
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub struct TorrentInfo {
     pub length: i64,
@@ -17,7 +19,7 @@ pub struct TorrentInfo {
 }
 
 impl TorrentInfo {
-    pub fn from(input: Bencode) -> Result<Self, String> {
+    pub fn from(input: Bencode) -> Result<Self, Error> {
         let length = input.get_number("length")?;
         let name = input.get_string("name")?;
         let piece_length = input.get_number("piece length")?;
@@ -99,46 +101,54 @@ mod tests {
     use super::*;
     use crate::bencoding::decoder::decode;
 
-    fn torrent_info(data: &[u8]) -> Result<TorrentInfo, String> {
+    fn torrent_info(data: &[u8]) -> Result<TorrentInfo, Error> {
         TorrentInfo::from(
             decode(data.to_vec())
         )
     }
 
+    fn assert_result_matches_error(msg: String, result: Result<TorrentInfo, Error>) {
+        let actual = match result {
+            Ok(_) => panic!("Unexpected Ok value."),
+            Err(e) => e,
+        };
+        assert_eq!(msg, format!("{}", actual));
+    }
+
     #[test]
     fn test_err_when_input_is_not_a_dictionary() {
         let result = torrent_info(b"le");
-        assert_eq!(Err("Bencode is not a dict.".to_string()), result);
+        assert_result_matches_error("Bencode is not a dict.".to_string(), result);
     }
 
     #[test]
     fn test_err_when_input_is_an_empty_dictionary() {
         let result = torrent_info(b"de");
-        assert_eq!(Err("\"length\" key is not present in torrent file.".to_string()), result);
+        assert_result_matches_error("\"length\" key is not present in torrent file.".to_string(), result);
     }
 
     #[test]
     fn test_err_when_length_is_present() {
         let result = torrent_info(b"d6:lengthi4ee");
-        assert_eq!(Err("\"name\" key is not present in torrent file.".to_string()), result);
+        assert_result_matches_error("\"name\" key is not present in torrent file.".to_string(), result);
     }
 
     #[test]
     fn test_err_when_name_is_present() {
         let result = torrent_info(b"d6:lengthi4e4:name5:dereke");
-        assert_eq!(Err("\"piece length\" key is not present in torrent file.".to_string()), result);
+        assert_result_matches_error("\"piece length\" key is not present in torrent file.".to_string(), result);
     }
 
     #[test]
     fn test_err_when_piece_length_is_present() {
         let result = torrent_info(b"d6:lengthi4e4:name5:derek12:piece lengthi100ee");
-        assert_eq!(Err("\"private\" key is not present in torrent file.".to_string()), result);
+        assert_result_matches_error("\"private\" key is not present in torrent file.".to_string(), result);
     }
 
     #[test]
     fn test_err_when_private_is_present() {
         let result = torrent_info(b"d6:lengthi4e4:name5:derek12:piece lengthi100e7:privatei1ee");
-        assert_eq!(Err("\"pieces\" key is not present in torrent file.".to_string()), result);
+        assert_result_matches_error("\"pieces\" key is not present in torrent file.".to_string(), result);
     }
 
     #[test]

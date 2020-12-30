@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::{str, fmt};
 use crate::bencoding::byte_string::ByteString;
+use crate::bencoding::error::Error;
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum Bencode {
@@ -15,22 +16,22 @@ pub type ListVec = Vec<Bencode>;
 pub type DictMap = BTreeMap<ByteString, Bencode>;
 
 impl Bencode {
-    pub fn remove(self, key: &str) -> Result<Bencode, String> {
+    pub fn remove(self, key: &str) -> Result<Bencode, Error> {
         let mut dict = match self {
             Bencode::Dict(d) => d,
-            _ => return Err("Bencode is not a dict".to_string()),
+            _ => return Err(Error::new("Bencode is not a dict".to_string())),
         };
 
         match dict.remove(&ByteString::from_str(key)) {
             Some(value) => Ok(value),
-            None => return Err(format!("\"{}\" key is not present in torrent file.", key)),
+            None => return Err(Error::new(format!("\"{}\" key is not present in torrent file.", key))),
         }
     }
 
-    pub fn remove_bytestring(self, key: &str) -> Result<Vec<u8>, String> {
+    pub fn remove_bytestring(self, key: &str) -> Result<Vec<u8>, Error> {
         let mut dict = match self {
             Bencode::Dict(d) => d,
-            _ => return Err("Bencode is not a dict".to_string()),
+            _ => return Err(Error::new("Bencode is not a dict".to_string())),
         };
 
         let index = &ByteString::from_str(key);
@@ -39,55 +40,55 @@ impl Bencode {
             if let Bencode::ByteString(_) = value {
                 match dict.remove(index) {
                     Some(Bencode::ByteString(s)) => Ok(s),
-                    Some(_) => Err(format!("Something went wrong removing \"{}\" from Bencode struct, value was not a ByteString.", key)),
-                    None => Err(format!("Something went wrong removing \"{}\" from Bencode struct.", key)),
+                    Some(_) => Err(Error::new(format!("Something went wrong removing \"{}\" from Bencode struct, value was not a ByteString.", key))),
+                    None => Err(Error::new(format!("Something went wrong removing \"{}\" from Bencode struct.", key))),
                 }
             } else {
-                Err(format!("\"{}\" value is not a ByteString", key))
+                Err(Error::new(format!("\"{}\" value is not a ByteString", key)))
             }
         } else {
-            Err(format!("\"{}\" key is not present in torrent file.", key))
+            Err(Error::new(format!("\"{}\" key is not present in torrent file.", key)))
         }
     }
 
-    pub fn get_string(&self, key: &str) -> Result<String, String> {
+    pub fn get_string(&self, key: &str) -> Result<String, Error> {
         let dict = match self {
             Bencode::Dict(d) => d,
-            _ => return Err("Bencode is not a dict.".to_string()),
+            _ => return Err(Error::new("Bencode is not a dict.".to_string())),
         };
 
         let bencode_value = match dict.get(&ByteString::from_str(key)) {
             Some(value) => value,
-            None => return Err(format!("\"{}\" key is not present in torrent file.", key)),
+            None => return Err(Error::new(format!("\"{}\" key is not present in torrent file.", key))),
         };
 
         let byte_string = match bencode_value {
             Bencode::ByteString(s) => s,
-            _ => return Err(format!("\"{}\" value is not a ByteString.", key)),
+            _ => return Err(Error::new(format!("\"{}\" value is not a ByteString.", key))),
         };
 
         let bytes: &[u8] = &byte_string;
 
         match str::from_utf8(bytes) {
             Ok(utf8) => Ok(utf8.to_string()),
-            Err(_) => Err(format!("\"{}\" not valid utf-8.", key)),
+            Err(_) => Err(Error::new(format!("\"{}\" not valid utf-8.", key))),
         }
     }
 
-    pub fn get_number(&self, key: &str) -> Result<i64, String> {
+    pub fn get_number(&self, key: &str) -> Result<i64, Error> {
         let dict = match self {
             Bencode::Dict(d) => d,
-            _ => return Err("Bencode is not a dict.".to_string()),
+            _ => return Err(Error::new("Bencode is not a dict.".to_string())),
         };
 
         let bencode_value = match dict.get(&ByteString::from_str(key)) {
             Some(value) => value,
-            None => return Err(format!("\"{}\" key is not present in torrent file.", key)),
+            None => return Err(Error::new(format!("\"{}\" key is not present in torrent file.", key))),
         };
 
         match bencode_value {
             Bencode::Number(s) => Ok(*s),
-            _ => Err(format!("\"{}\" value is not an i64.", key)),
+            _ => Err(Error::new(format!("\"{}\" value is not an i64.", key))),
         }
     }
 }
