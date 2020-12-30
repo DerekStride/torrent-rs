@@ -19,7 +19,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     assert_eq!(data, stream_data);
     let torrent = Torrent::from(stream_data)?;
 
-    let client = Client::new(torrent);
+    let mut client = Client::new(torrent);
     let tracker_info = client.tracker_info().await?;
 
     println!("tracker_info: {}", tracker_info);

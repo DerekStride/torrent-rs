@@ -15,12 +15,12 @@ pub struct Client {
 impl Client {
     pub fn new(torrent: Torrent) -> Self {
         Self {
-            torrent: torrent,
+            torrent,
             tracker_info: None,
         }
     }
 
-    pub async fn tracker_info(&self) -> Result<TrackerInfo, Error> {
+    pub async fn tracker_info(&mut self) -> Result<&TrackerInfo, Error> {
         let announce_url = self.torrent.announce_url()?;
         let uri: hyper::Uri = announce_url.parse()?;
         let client = hyper::Client::new();
@@ -29,7 +29,9 @@ impl Client {
         let buf = hyper::body::to_bytes(resp).await?;
         let response_data = decoder::decode(buf.to_vec());
 
-        Ok(TrackerInfo::from(response_data)?)
+        self.tracker_info = Some(TrackerInfo::from(response_data)?);
+
+        Ok(&self.tracker_info.as_ref().unwrap())
     }
 }
 
@@ -80,7 +82,7 @@ mod tests {
     #[tokio::test]
     async fn test_mock() {
         let expected = tracker_info_struct();
-        let client = client();
+        let mut client = client();
         let m = mock("GET", Matcher::Regex(".*".into()))
             .with_status(200)
             .with_header("content-type", "text/plain")
@@ -94,6 +96,6 @@ mod tests {
         };
 
         m.assert();
-        assert_eq!(expected, tracker_info);
+        assert_eq!(&expected, tracker_info);
     }
 }
