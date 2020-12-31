@@ -1,11 +1,15 @@
 use std::fs;
 use std::io::Read;
 use tokio;
+
 mod bencoding;
 mod torrent;
 mod client;
+mod utp;
+
 use torrent::torrent::Torrent;
 use client::client::Client;
+use utp::header::Header;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -24,5 +28,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     println!("tracker_info: {}", tracker_info);
     
+    let header = Header::new(0, 1, 0, 42, 1997, 3, 4048, 5, 3);
+    println!("{}", header);
+
     Ok(())
 }
