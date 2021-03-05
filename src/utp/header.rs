@@ -13,10 +13,11 @@
 // +---------------+---------------+---------------+---------------+
 
 use std::fmt;
+use crate::utp::packet_type::PacketType;
 
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub struct Header {
-    packet_type: u8,
+    packet_type: PacketType,
     version: u8,
     extension: u8,
     connection_id: u16,
@@ -28,7 +29,7 @@ pub struct Header {
 }
 
 impl Header {
-    pub fn new(packet_type: u8, version: u8, extension: u8, connection_id: u16, timestamp_microseconds: u32, timestamp_difference_microseconds: u32, wnd_size: u32, seq_nr: u16, ack_nr: u16) -> Self {
+    pub fn new(packet_type: PacketType, version: u8, extension: u8, connection_id: u16, timestamp_microseconds: u32, timestamp_difference_microseconds: u32, wnd_size: u32, seq_nr: u16, ack_nr: u16) -> Self {
         Self { 
             packet_type,
             version,
@@ -47,7 +48,7 @@ impl fmt::Display for Header {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         writeln!(fmt, "0       4       8               16              24              32")?;
         writeln!(fmt, "+-------+-------+---------------+---------------+---------------+")?;
-        writeln!(fmt, "| {:#x}   | {:#x}   | {:#04x}          | {:#06x}                        |", self.packet_type, self.version, self.extension, self.connection_id)?;
+        writeln!(fmt, "| {}   | {:#x}   | {:#04x}          | {:#06x}                        |", self.packet_type, self.version, self.extension, self.connection_id)?;
         writeln!(fmt, "+-------+-------+---------------+---------------+---------------+")?;
         writeln!(fmt, "| {:#010x}                                                    |", self.timestamp_microseconds)?;
         writeln!(fmt, "+---------------+---------------+---------------+---------------+")?;
@@ -67,7 +68,7 @@ mod tests {
     #[test]
     fn test_display() {
         let header = Header {
-            packet_type: 0,
+            packet_type: PacketType::STData,
             version: 1,
             extension: 0,
             connection_id: 42,

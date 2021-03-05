@@ -10,6 +10,7 @@ mod utp;
 use torrent::torrent::Torrent;
 use client::client::Client;
 use utp::header::Header;
+use utp::packet_type::PacketType;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -28,7 +29,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     println!("tracker_info: {}", tracker_info);
     
-    let header = Header::new(0, 1, 0, 42, 1997, 3, 4048, 5, 3);
+    let header = Header::new(PacketType::STData, 1, 0, 42, 1997, 3, 4048, 5, 3);
     println!("{}", header);
 
     Ok(())
